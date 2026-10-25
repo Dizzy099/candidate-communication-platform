@@ -50,7 +50,7 @@ Legend: ✅ done and verified · 🟡 done, partly verified · ⛔ blocked (exte
 | Docker Compose (PostgreSQL) | ✅ | Built and run locally |
 | Single-container deploy image | ✅ | Built and run locally; e2e passed |
 | README, API docs, manual checklist | ✅ | |
-| GitHub repository pushed | ⛔ | Needs the owner's go-ahead (public action) |
+| GitHub repository pushed | ✅ | https://github.com/Dizzy099/candidate-communication-platform |
 | Public deployment | ⛔ | Needs a hosting account login (Render blueprint ready) |
 | Authentication | ✖ | Out of scope by decision (README §12) |
 | Template edit/delete UI | ✖ | API supports it; UI covers create and use |

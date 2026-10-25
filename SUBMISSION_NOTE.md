@@ -1,6 +1,6 @@
 # Submission: Candidate Communication Platform
 
-**Repository:** _[add the GitHub link after pushing]_
+**Repository:** https://github.com/Dizzy099/candidate-communication-platform
 **Live demo:** _[add the deployed link, or delete this line if submitting the repository only]_
 
 Hi,

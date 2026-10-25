@@ -23,13 +23,21 @@ from django.utils import timezone
 from ..models import (
     AttemptOutcome,
     AttemptTrigger,
+    ErrorCategory,
     EventKind,
     Message,
     MessageAttempt,
     MessageStatus,
 )
 from ..policy import backoff_seconds, should_auto_retry
-from ..providers import CommunicationProvider, OutboundMessage, ProviderError, SendResult, get_provider
+from ..providers import (
+    CommunicationProvider,
+    OutboundMessage,
+    ProviderError,
+    SendResult,
+    UnknownProvider,
+    get_provider,
+)
 from .events import record_event
 
 logger = logging.getLogger(__name__)
@@ -87,13 +95,16 @@ def claim_due_messages(now=None, limit: int | None = None) -> list:
     return claimed
 
 
-def process_message(message_id, provider: CommunicationProvider | None = None) -> None:
-    provider = provider or get_provider()
+def process_message(message_id) -> None:
     try:
         message = Message.objects.select_related("candidate").get(id=message_id, status=MessageStatus.SENDING)
     except Message.DoesNotExist:
         logger.info("Message %s no longer claimable (deleted or updated); skipping", message_id)
         return
+    try:
+        provider = get_provider(message.provider)
+    except UnknownProvider:
+        provider = None
 
     attempt = MessageAttempt.objects.create(
         message=message,
@@ -109,9 +120,12 @@ def process_message(message_id, provider: CommunicationProvider | None = None) -
         to_email=message.candidate.email,
         body=message.body,
         channel=message.channel,
-        status_callback_url=webhook_url(provider),
+        status_callback_url=webhook_url(provider) if provider else "",
     )
     try:
+        if provider is None:
+            raise ProviderError(ErrorCategory.CONFIGURATION, "provider_not_configured",
+                                f"Provider '{message.provider}' is no longer configured.")
         result = provider.send(outbound)
     except ProviderError as error:
         logger.info("Message %s attempt %s failed: %s/%s", message.id, attempt.number, error.category, error.code)
@@ -124,7 +138,7 @@ def process_message(message_id, provider: CommunicationProvider | None = None) -
             ProviderError("unknown", "unexpected_error", "An unexpected error occurred while sending."),
         )
     else:
-        logger.info("Message %s accepted by %s as %s", message.id, provider.name, result.provider_message_id)
+        logger.info("Message %s accepted by %s as %s", message.id, message.provider, result.provider_message_id)
         _record_success(message.id, attempt.id, result)
 
 
@@ -201,11 +215,10 @@ def _record_failure(message_id, attempt_id, error: ProviderError) -> None:
             message.save()
 
 
-def run_once(provider: CommunicationProvider | None = None, now=None) -> int:
+def run_once(now=None) -> int:
     """One worker tick. Returns how many messages were processed."""
-    provider = provider or get_provider()
     recover_stale_leases(now)
     claimed = claim_due_messages(now)
     for message_id in claimed:
-        process_message(message_id, provider)
+        process_message(message_id)
     return len(claimed)

@@ -12,6 +12,9 @@
 | 777    | always_temporary_error  | 500 on every submission                                  |
 | other  | normal                  | sent -> delivered -> read                                |
 
+Email channel: an address containing ``bounce`` is an invalid recipient and one
+containing ``deferred`` fails delivery the first time; everything else is normal.
+
 No randomness: the same input always produces the same behaviour.
 """
 
@@ -19,6 +22,7 @@ import re
 from dataclasses import dataclass, field
 
 E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 @dataclass(frozen=True)
@@ -59,8 +63,18 @@ SUFFIXES = {
 }
 
 
-def scenario_key(to: str) -> str:
+EMAIL_MARKERS = {"bounce": "invalid_recipient", "deferred": "delivery_fails_first"}
+
+
+def scenario_key(to: str, channel: str = "sms") -> str:
+    if channel == "email":
+        local = to.split("@", 1)[0].lower()
+        return next((key for marker, key in EMAIL_MARKERS.items() if marker in local), "normal")
     return SUFFIXES.get(to[-3:], "normal")
+
+
+def valid_recipient(to: str, channel: str) -> bool:
+    return bool(EMAIL.match(to) if channel == "email" else E164.match(to))
 
 
 def build_scenario(key: str, *, delivery_delay: float, read_delay: float, previous_messages_to_number: int) -> Scenario:

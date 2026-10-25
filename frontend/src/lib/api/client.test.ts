@@ -25,7 +25,7 @@ describe("apiFetch", () => {
           { status: 400 },
         ),
     );
-    const error = await apiFetch("/x").catch((e) => e);
+    const error = (await apiFetch("/x").catch((e: unknown) => e)) as ApiError;
     expect(error).toBeInstanceOf(ApiError);
     expect(error.code).toBe("validation_error");
     expect(error.fields).toEqual({ phone: "Bad number" });
@@ -33,7 +33,7 @@ describe("apiFetch", () => {
 
   it("never shows raw proxy pages: falls back to a generic message", async () => {
     mockFetch(async () => new Response("<html>Bad Gateway</html>", { status: 502 }));
-    const error = await apiFetch("/x").catch((e) => e);
+    const error = (await apiFetch("/x").catch((e: unknown) => e)) as ApiError;
     expect(errorMessage(error)).toBe("The server is temporarily unreachable. Please try again shortly.");
   });
 
@@ -41,7 +41,7 @@ describe("apiFetch", () => {
     mockFetch(async () => {
       throw new TypeError("Failed to fetch");
     });
-    const error = await apiFetch("/x").catch((e) => e);
+    const error = (await apiFetch("/x").catch((e: unknown) => e)) as ApiError;
     expect(error.code).toBe("network_error");
     expect(error.message).toMatch(/Can't reach the server/);
   });

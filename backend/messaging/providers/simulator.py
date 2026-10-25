@@ -60,11 +60,14 @@ class SimulatorProvider(CommunicationProvider):
         return self._client
 
     # --- sending ----------------------------------------------------------
+    def recipient(self, message: OutboundMessage) -> str:
+        return message.to_phone
+
     def send(self, message: OutboundMessage) -> SendResult:
         if not self.api_key:
             raise ProviderError(ErrorCategory.CONFIGURATION, "missing_api_key", "Provider API key is not configured.")
         payload = {
-            "to": message.to_phone,
+            "to": self.recipient(message),
             "body": message.body,
             "channel": message.channel,
             "client_reference": message.client_reference,
@@ -187,3 +190,14 @@ class SimulatorProvider(CommunicationProvider):
         if timezone.is_naive(update.occurred_at):
             raise WebhookError("Timestamp must include a timezone.", 400)
         return update
+
+
+class SimulatorEmailProvider(SimulatorProvider):
+    """SimuMail: the simulator's email channel. Same service, separate adapter and recipient type."""
+
+    name = "simulator_email"
+    display_name = "SimuMail (simulated email provider)"
+    channel = "email"
+
+    def recipient(self, message: OutboundMessage) -> str:
+        return message.to_email

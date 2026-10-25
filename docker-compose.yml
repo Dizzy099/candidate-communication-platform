@@ -8,7 +8,7 @@ x-api-env: &api-env
   DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,api
   DJANGO_SECURE_COOKIES: "false"
   DATABASE_URL: postgres://ccp:${POSTGRES_PASSWORD:-ccp-local-only}@db:5432/ccp
-  PROVIDER_BACKEND: simulator
+  PROVIDER_BACKENDS: simulator,simulator_email
   PROVIDER_BASE_URL: http://simulator:8001
   PROVIDER_API_KEY: ${PROVIDER_API_KEY:-compose-local-provider-key}
   PROVIDER_WEBHOOK_SECRET: ${PROVIDER_WEBHOOK_SECRET:-compose-local-webhook-secret}

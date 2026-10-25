@@ -15,6 +15,7 @@ import { useNotifications } from "@/components/Notifications";
 import { useProviderHealth } from "@/hooks/data";
 import { errorMessage } from "@/lib/api/client";
 import { api } from "@/lib/api/endpoints";
+import { channelLabel, shortProviderName } from "@/lib/channels";
 import { formatTimeWithSeconds } from "@/lib/format";
 
 const STATUS = {
@@ -52,6 +53,7 @@ export function ProviderStatus() {
   }
 
   const stats = data?.stats;
+  const simulated = data?.providers.some((p) => p.simulated) ?? false;
   return (
     <>
       <ButtonBase
@@ -61,7 +63,7 @@ export function ProviderStatus() {
       >
         <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: status.color, flexShrink: 0 }} />
         <Typography component="span" sx={{ fontSize: 13, color: "#424242", whiteSpace: "nowrap" }}>
-          {data?.provider.simulated ? "Simulated provider" : "Provider"} · {status.label}
+          {simulated ? "Simulated providers" : "Providers"} · {status.label}
         </Typography>
       </ButtonBase>
       <Popover
@@ -71,18 +73,28 @@ export function ProviderStatus() {
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         slotProps={{ paper: { sx: { width: 340, p: 2.5, mt: 1 } } }}
       >
-        <Typography sx={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>Communication service</Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{data?.provider.display_name ?? "Provider"}</Typography>
-          {data?.provider.simulated && <Chip size="small" label="Simulated" sx={{ height: 20, fontSize: 11 }} />}
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}>
-          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: status.color }} />
-          <Typography sx={{ fontWeight: 700, color: status.color }}>{status.label}</Typography>
-        </Box>
-        <Typography sx={{ fontSize: 13, mt: 0.5, color: "#424242" }}>
-          {error ? "Couldn't check the messaging service. Messages will be retried when it's reachable." : data?.detail}
-        </Typography>
+        <Typography sx={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>Communication services</Typography>
+        {error && (
+          <Typography sx={{ fontSize: 13, mt: 1, color: "#C62828" }}>
+            Couldn&apos;t check the messaging services. Messages will be retried when they&apos;re reachable.
+          </Typography>
+        )}
+        {data?.providers.map((p) => {
+          const s = STATUS[p.status] ?? STATUS.unknown;
+          return (
+            <Box key={p.name} sx={{ mt: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: s.color, flexShrink: 0 }} />
+                <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
+                  {channelLabel(p.channel)} · {shortProviderName(p.display_name)}
+                </Typography>
+                {p.simulated && <Chip size="small" label="Simulated" sx={{ height: 20, fontSize: 11 }} />}
+              </Box>
+              <Typography sx={{ fontSize: 13, ml: 2.25, color: s.color, fontWeight: 700 }}>{s.label}</Typography>
+              <Typography sx={{ fontSize: 13, ml: 2.25, color: "#424242" }}>{p.detail}</Typography>
+            </Box>
+          );
+        })}
 
         {stats && (
           <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: 0.75, mt: 2, mb: 0 }}>
@@ -107,11 +119,11 @@ export function ProviderStatus() {
           </Typography>
         )}
 
-        {data?.provider.simulated && (
+        {simulated && data && (
           <>
             <Divider sx={{ my: 2 }} />
             <Typography sx={{ fontSize: 12, color: "rgba(0,0,0,0.6)" }}>
-              This demo uses SimuText, a simulated SMS provider. No real messages are sent.
+              This demo uses simulated providers (SimuText for SMS, SimuMail for email). No real messages are sent.
             </Typography>
             {data.scenarios.length > 0 && (
               <>
@@ -126,8 +138,11 @@ export function ProviderStatus() {
                 <Collapse in={showScenarios}>
                   <Box component="ul" sx={{ pl: 2, my: 1, fontSize: 12, lineHeight: 1.6 }}>
                     {data.scenarios.map((s) => (
-                      <li key={s.suffix}>
-                        Ends in <b>{s.suffix}</b>: {s.behaviour}
+                      <li key={`${s.channel}-${s.match}`}>
+                        <b>
+                          {channelLabel(s.channel)} · {s.match}
+                        </b>
+                        : {s.behaviour}
                       </li>
                     ))}
                   </Box>

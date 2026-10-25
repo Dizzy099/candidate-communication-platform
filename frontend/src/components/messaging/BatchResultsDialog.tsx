@@ -15,6 +15,7 @@ import { useBatch } from "@/hooks/data";
 import { errorMessage } from "@/lib/api/client";
 import { api } from "@/lib/api/endpoints";
 import type { BatchMessage } from "@/lib/api/types";
+import { channelLabel } from "@/lib/channels";
 import { formatDateTime, plural } from "@/lib/format";
 
 function SummaryTile({ label, value, color }: { label: string; value: number; color?: string }) {
@@ -69,7 +70,8 @@ export function BatchResultsDialog({ batchId, onClose, onChanged }: { batchId: s
       {batch && s && (
         <>
           <Typography variant="caption" component="p">
-            Sent {formatDateTime(batch.created_at)} · {plural(batch.recipient_count, "recipient")} · each tracked separately
+            Sent {formatDateTime(batch.created_at)} via {channelLabel(batch.channel)} · {plural(batch.recipient_count, "recipient")} ·
+            each tracked separately
           </Typography>
           <Box sx={{ mt: 1, p: 1.5, bgcolor: "#F6F6F6", borderRadius: 1, fontSize: 14, whiteSpace: "pre-wrap", maxHeight: 90, overflow: "auto" }}>
             {batch.body}

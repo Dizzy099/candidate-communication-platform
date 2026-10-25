@@ -89,13 +89,17 @@ def submit_message(request):
     SubmissionCounter.objects.filter(idempotency_key=key).update(attempts=F("attempts") + 1)
     attempt = SubmissionCounter.objects.get(idempotency_key=key).attempts
 
-    if not scenarios.E164.match(to):
-        return error(422, "invalid_recipient", "'to' must be an E.164 phone number.")
+    channel = str(data.get("channel", "sms"))[:20]
+    if channel not in ("sms", "email"):
+        return error(400, "invalid_request", "'channel' must be 'sms' or 'email'.")
+    if not scenarios.valid_recipient(to, channel):
+        expected = "an email address" if channel == "email" else "an E.164 phone number"
+        return error(422, "invalid_recipient", f"'to' must be {expected}.")
     if len(body) > CFG["MAX_BODY_LENGTH"]:
         return error(400, "content_too_long", f"Message exceeds {CFG['MAX_BODY_LENGTH']} characters.")
 
     scenario = scenarios.build_scenario(
-        scenarios.scenario_key(to),
+        scenarios.scenario_key(to, channel),
         delivery_delay=CFG["DELIVERY_DELAY_SECONDS"],
         read_delay=CFG["READ_DELAY_SECONDS"],
         previous_messages_to_number=SimulatedMessage.objects.filter(to=to).count(),
@@ -112,7 +116,7 @@ def submit_message(request):
                 idempotency_key=key,
                 client_reference=str(data.get("client_reference", ""))[:100],
                 to=to,
-                channel=str(data.get("channel", "sms"))[:20],
+                channel=channel,
                 body_length=len(body),
                 callback_url=callback,
                 scenario=scenario.key,

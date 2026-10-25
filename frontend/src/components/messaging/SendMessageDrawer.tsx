@@ -9,16 +9,19 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useMemo, useRef, useState } from "react";
 import { DialogShell } from "@/components/DialogShell";
 import { DrawerShell } from "@/components/DrawerShell";
 import { useNotifications } from "@/components/Notifications";
-import { useTemplates, useTemplateVariables } from "@/hooks/data";
+import { useProviderHealth, useTemplates, useTemplateVariables } from "@/hooks/data";
 import { ApiError, errorMessage } from "@/lib/api/client";
 import { api } from "@/lib/api/endpoints";
 import type { Candidate } from "@/lib/api/types";
+import { channelLabel, shortProviderName } from "@/lib/channels";
 import { localInputToIso, plural, toLocalInputValue } from "@/lib/format";
 import { newRequestId } from "@/lib/ids";
 import { RecipientChips } from "./RecipientChips";
@@ -48,6 +51,7 @@ function SendMessageForm({ recipients, onClose, onSent }: Props & { recipients: 
   const { notify } = useNotifications();
   const { data: templates, mutate: refreshTemplates } = useTemplates(true);
   const { data: variables } = useTemplateVariables(true);
+  const { data: health } = useProviderHealth();
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   // One ID per compose session: double clicks and network retries can't create a second send.
@@ -63,6 +67,10 @@ function SendMessageForm({ recipients, onClose, onSent }: Props & { recipients: 
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [chosenProvider, setChosenProvider] = useState<string | null>(null);
+  const providers = health?.providers ?? [];
+  const providerName = chosenProvider ?? health?.default_provider ?? null;
+  const selectedProvider = providers.find((p) => p.name === providerName);
 
   const count = recipients.length;
   const trimmed = body.trim();
@@ -103,7 +111,13 @@ function SendMessageForm({ recipients, onClose, onSent }: Props & { recipients: 
     setFormError(null);
     setFieldErrors({});
     const scheduledIso = scheduleOn ? localInputToIso(scheduleAt) : null;
-    const payload = { body: trimmed, client_request_id: requestId, template_id: templateId || null, scheduled_at: scheduledIso };
+    const payload = {
+      body: trimmed,
+      client_request_id: requestId,
+      template_id: templateId || null,
+      scheduled_at: scheduledIso,
+      ...(providerName ? { provider: providerName } : {}),
+    };
     try {
       let batchId: string;
       if (count === 1) {
@@ -175,6 +189,38 @@ function SendMessageForm({ recipients, onClose, onSent }: Props & { recipients: 
       >
         <Typography sx={{ fontSize: 16, mt: 3, mb: 1.5 }}>{plural(count, "Recipient")}</Typography>
         <RecipientChips names={names} />
+
+        {providers.length > 1 && (
+          <Box sx={{ mt: 4 }}>
+            <Typography id="send-via-label" sx={{ fontSize: 16, mb: 1 }}>
+              Send via
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={providerName}
+              onChange={(_, value: string | null) => value && setChosenProvider(value)}
+              aria-labelledby="send-via-label"
+              disabled={sending}
+            >
+              {providers.map((p) => (
+                <ToggleButton key={p.name} value={p.name} sx={{ textTransform: "none", px: 2, gap: 1 }}>
+                  <Box
+                    component="span"
+                    sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: p.status === "operational" ? "#2E7D32" : "#C62828" }}
+                  />
+                  {channelLabel(p.channel)} · {shortProviderName(p.display_name)}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            {selectedProvider && selectedProvider.status !== "operational" && (
+              <Alert severity="warning" sx={{ mt: 1.5, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400 } }}>
+                {shortProviderName(selectedProvider.display_name)} is currently unavailable. Messages will be saved and
+                retried automatically; if they still fail you can retry them later.
+              </Alert>
+            )}
+          </Box>
+        )}
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 4 }} alignItems={{ sm: "center" }}>
           <TextField

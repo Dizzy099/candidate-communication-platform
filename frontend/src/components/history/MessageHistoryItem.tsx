@@ -12,6 +12,7 @@ import Typography from "@mui/material/Typography";
 import { useState, type ReactNode } from "react";
 import { StatusChip } from "@/components/StatusChip";
 import type { MessageDetail } from "@/lib/api/types";
+import { channelLabel } from "@/lib/channels";
 import { formatDate, formatDateTime, formatTime, formatTimeWithSeconds } from "@/lib/format";
 
 const TRIGGER_LABEL = { initial: "First send", auto_retry: "Automatic retry", manual_retry: "Manual retry" } as const;
@@ -53,6 +54,8 @@ export function MessageHistoryItem({
           <Caption>{formatDate(when)}</Caption>
           <Caption>|</Caption>
           <Caption>{formatTime(when)}</Caption>
+          <Caption>|</Caption>
+          <Caption>{channelLabel(message.channel)}</Caption>
         </Box>
         <StatusChip status={message.status} retrying={message.retry_scheduled} />
       </Box>
@@ -65,7 +68,7 @@ export function MessageHistoryItem({
         <Alert
           severity="error"
           variant="outlined"
-          sx={{ mt: 2, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400, width: "100%" } }}
+          sx={{ mt: 2, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400, lineHeight: 1.5, width: "100%" } }}
           action={
             message.can_retry ? (
               <Button
@@ -89,7 +92,7 @@ export function MessageHistoryItem({
       )}
 
       {message.retry_scheduled && message.error && (
-        <Alert severity="warning" sx={{ mt: 2, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400 } }}>
+        <Alert severity="warning" sx={{ mt: 2, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400, lineHeight: 1.5 } }}>
           <b>{message.error.title}.</b> Retrying automatically
           {message.next_attempt_at ? ` at ${formatTimeWithSeconds(message.next_attempt_at)}` : ""} (attempt{" "}
           {message.attempt_count + 1} of {message.max_attempts}).
@@ -99,7 +102,7 @@ export function MessageHistoryItem({
       {message.status === "scheduled" && message.scheduled_at && (
         <Alert
           severity="info"
-          sx={{ mt: 2, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400 } }}
+          sx={{ mt: 2, "& .MuiAlert-message": { fontSize: 14, fontWeight: 400, lineHeight: 1.5 } }}
           action={
             <Button color="inherit" size="small" onClick={() => run("cancel")} disabled={busy !== null}>
               {busy === "cancel" ? <CircularProgress size={14} color="inherit" /> : "Cancel"}
@@ -123,7 +126,7 @@ export function MessageHistoryItem({
         <Box sx={{ mt: 1, p: 2, bgcolor: "#FAFAFA", borderRadius: 1, fontSize: 13 }}>
           <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "max-content 1fr", columnGap: 2, rowGap: 0.5, m: 0 }}>
             <dt>Provider</dt>
-            <dd style={{ margin: 0 }}>{message.provider}{message.provider === "simulator" ? " (simulated)" : ""}</dd>
+            <dd style={{ margin: 0 }}>{message.provider_label}</dd>
             <dt>Provider reference</dt>
             <dd style={{ margin: 0, fontFamily: "monospace" }}>{message.provider_message_id ?? (message.status === "failed" ? "None (the provider did not accept it)" : "Not assigned yet")}</dd>
             <dt>Attempts</dt>

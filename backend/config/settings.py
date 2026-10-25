@@ -7,6 +7,7 @@ a secret key must be provided unless DEBUG is explicitly enabled.
 
 import os
 import sys
+import warnings
 from pathlib import Path
 
 import dj_database_url
@@ -122,6 +123,8 @@ USE_TZ = True  # all timestamps are stored as timezone-aware UTC
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# runserver serves static files itself in development; whitenoise only matters after collectstatic.
+warnings.filterwarnings("ignore", message="No directory at", module="whitenoise.base")
 
 # --- API ----------------------------------------------------------------------
 REST_FRAMEWORK = {
@@ -153,7 +156,8 @@ if not DEBUG:
 
 # --- Communication provider ---------------------------------------------------
 PROVIDER = {
-    "BACKEND": os.getenv("PROVIDER_BACKEND", "simulator"),
+    # Enabled providers; the first one is the default. Recruiters choose per message.
+    "BACKENDS": env_list("PROVIDER_BACKENDS", "simulator,simulator_email"),
     "BASE_URL": os.getenv("PROVIDER_BASE_URL", "http://127.0.0.1:8001"),
     "API_KEY": os.getenv("PROVIDER_API_KEY", ""),
     "WEBHOOK_SECRET": os.getenv("PROVIDER_WEBHOOK_SECRET", ""),

@@ -74,6 +74,7 @@ export interface Message {
   body: string;
   channel: string;
   provider: string;
+  provider_label: string;
   status: MessageStatus;
   status_label: string;
   provider_message_id: string | null;
@@ -150,11 +151,22 @@ export interface TemplateVariable {
   description: string;
 }
 
-export interface ProviderHealth {
-  provider: { name: string; display_name: string; channel: string; simulated: boolean };
+export interface ProviderInfo {
+  name: string;
+  display_name: string;
+  channel: string;
+  simulated: boolean;
   status: "operational" | "degraded" | "unavailable";
   detail: string;
   checked_at: string;
+}
+
+export interface ProviderHealth {
+  status: "operational" | "degraded" | "unavailable";
+  detail: string;
+  checked_at: string;
+  default_provider: string;
+  providers: ProviderInfo[];
   stats: {
     total: number;
     sent: number;
@@ -165,7 +177,7 @@ export interface ProviderHealth {
     scheduled: number;
   };
   demo_controls_enabled: boolean;
-  scenarios: { suffix: string; behaviour: string }[];
+  scenarios: { channel: string; match: string; behaviour: string }[];
 }
 
 export interface NewCandidate {
@@ -179,4 +191,5 @@ export interface SendPayload {
   client_request_id: string;
   template_id?: number | null;
   scheduled_at?: string | null;
+  provider?: string;
 }

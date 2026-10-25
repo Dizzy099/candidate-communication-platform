@@ -1,5 +1,6 @@
 """The simulator adapter (HTTP contract, error classification, signatures) and the webhook endpoint."""
 
+import dataclasses
 import json
 import time
 
@@ -11,10 +12,10 @@ from core.testing import make_candidate
 from messaging.models import ErrorCategory, Message, MessageStatus
 from messaging.providers import OutboundMessage, ProviderError, WebhookError
 from messaging.providers.registry import reset_provider_cache
-from messaging.providers.simulator import SimulatorProvider, sign_payload
+from messaging.providers.simulator import SimulatorEmailProvider, SimulatorProvider, sign_payload
 
 CONFIG = {
-    "BACKEND": "simulator", "BASE_URL": "http://sim.test", "API_KEY": "key", "WEBHOOK_SECRET": "secret",
+    "BACKENDS": ["simulator", "simulator_email"], "BASE_URL": "http://sim.test", "API_KEY": "key", "WEBHOOK_SECRET": "secret",
     "TIMEOUT_SECONDS": 1.0, "PUBLIC_WEBHOOK_BASE_URL": "http://api.test", "WEBHOOK_TOLERANCE_SECONDS": 300,
 }
 OUTBOUND = OutboundMessage("ref-1", "idem-1", "+919800000001", "a@example.com", "Hi", "sms", "http://api.test/hook")
@@ -47,6 +48,19 @@ class AdapterSendTests(SimpleTestCase):
         self.assertEqual(seen["headers"]["Authorization"], "Bearer key")
         self.assertEqual(seen["body"]["callback_url"], "http://api.test/hook")
         self.assertEqual(seen["body"]["client_reference"], "ref-1")
+
+    def test_email_adapter_sends_to_the_email_address(self):
+        seen = {}
+
+        def handler(request):
+            seen.update(json.loads(request.content))
+            return httpx.Response(201, json={"id": "sim_2", "status": "sent"})
+
+        provider = SimulatorEmailProvider(CONFIG)
+        provider._client = httpx.Client(base_url="http://sim.test", transport=httpx.MockTransport(handler))
+        provider.send(dataclasses.replace(OUTBOUND, channel="email"))
+        self.assertEqual((seen["to"], seen["channel"]), ("a@example.com", "email"))
+        self.assertEqual((provider.name, provider.channel), ("simulator_email", "email"))
 
     def test_error_classification(self):
         cases = [
@@ -162,6 +176,14 @@ class WebhookEndpointTests(TestCase):
         for payload in [{"event_id": "e"}, self.payload(status="exploded"), self.payload(occurred_at="yesterday")]:
             with self.subTest(payload=payload):
                 self.assertEqual(self.post(payload).status_code, 400)
+
+    def test_email_provider_has_its_own_webhook_route(self):
+        Message.objects.filter(pk=self.message.pk).update(provider="simulator_email", channel="email")
+        response = self.post(self.payload(event_id="evt_mail"), provider="simulator_email")
+        self.assertEqual(response.json()["result"], "applied")
+        # The same provider message ID on the SMS route doesn't match an email message.
+        response = self.post(self.payload(event_id="evt_mail_2", status="read"), provider="simulator")
+        self.assertEqual(response.json()["result"], "unknown_message")
 
     def test_unknown_provider_and_method(self):
         self.assertEqual(self.post(self.payload(), provider="other").status_code, 404)

@@ -17,7 +17,7 @@ from candidates.models import Candidate
 from core.exceptions import ApiError
 
 from .models import Message, MessageBatch, MessageStatus, MessageTemplate
-from .providers import ProviderError, WebhookError, get_provider
+from .providers import ProviderError, UnknownProvider, WebhookError, get_provider, list_providers
 from .serializers import (
     BatchSerializer,
     BulkSendSerializer,
@@ -133,36 +133,48 @@ def _stats() -> dict:
 
 
 SIMULATOR_SCENARIOS = [
-    {"suffix": "000", "behaviour": "Invalid recipient (permanent failure, no retry)"},
-    {"suffix": "111", "behaviour": "Temporary provider error once, then sent by automatic retry"},
-    {"suffix": "222", "behaviour": "Rate limited once (Retry-After), then sent"},
-    {"suffix": "333", "behaviour": "Sent, then delivery fails (manual retry allowed)"},
-    {"suffix": "444", "behaviour": "Delivered but never read"},
-    {"suffix": "555", "behaviour": "Duplicate and out-of-order status updates"},
-    {"suffix": "666", "behaviour": "Fails 3 automatic attempts; succeeds on manual retry"},
-    {"suffix": "777", "behaviour": "Always fails temporarily (shows the retry limit)"},
+    {"channel": "sms", "match": "Number ends in 000", "behaviour": "Invalid recipient (permanent failure, no retry)"},
+    {"channel": "sms", "match": "Number ends in 111", "behaviour": "Temporary provider error once, then sent by automatic retry"},
+    {"channel": "sms", "match": "Number ends in 222", "behaviour": "Rate limited once (Retry-After), then sent"},
+    {"channel": "sms", "match": "Number ends in 333", "behaviour": "First message to the number fails delivery; retry succeeds"},
+    {"channel": "sms", "match": "Number ends in 444", "behaviour": "Delivered but never read"},
+    {"channel": "sms", "match": "Number ends in 555", "behaviour": "Duplicate and out-of-order status updates"},
+    {"channel": "sms", "match": "Number ends in 666", "behaviour": "Fails 3 automatic attempts; succeeds on manual retry"},
+    {"channel": "sms", "match": "Number ends in 777", "behaviour": "Always fails temporarily (shows the retry limit)"},
+    {"channel": "email", "match": "Address contains 'bounce'", "behaviour": "Mailbox doesn't exist (permanent failure)"},
+    {"channel": "email", "match": "Address contains 'deferred'", "behaviour": "First email fails delivery; retry succeeds"},
 ]
+HEALTH_ORDER = {"operational": 0, "degraded": 1, "unavailable": 2}
 
 
 class ProviderHealthView(APIView):
+    """Health of every configured provider plus overall message statistics."""
+
     def get(self, request):
-        provider = get_provider()
-        health = provider.health()
-        payload = {
-            "provider": {
+        providers = []
+        for provider in list_providers():
+            health = provider.health()
+            providers.append({
                 "name": provider.name,
                 "display_name": provider.display_name,
                 "channel": provider.channel,
                 "simulated": provider.simulated,
-            },
-            "status": health.status,
-            "detail": health.detail,
-            "checked_at": health.checked_at,
+                "status": health.status,
+                "detail": health.detail,
+                "checked_at": health.checked_at,
+            })
+        worst = max(providers, key=lambda p: HEALTH_ORDER.get(p["status"], 2))
+        any_simulated = any(p["simulated"] for p in providers)
+        return Response({
+            "status": worst["status"],
+            "detail": worst["detail"],
+            "checked_at": worst["checked_at"],
+            "default_provider": providers[0]["name"],
+            "providers": providers,
             "stats": _stats(),
-            "demo_controls_enabled": settings.DEMO_CONTROLS_ENABLED and provider.simulated,
-            "scenarios": SIMULATOR_SCENARIOS if provider.simulated else [],
-        }
-        return Response(payload)
+            "demo_controls_enabled": settings.DEMO_CONTROLS_ENABLED and any_simulated,
+            "scenarios": SIMULATOR_SCENARIOS if any_simulated else [],
+        })
 
 
 class SimulatorOutageView(APIView):
@@ -192,8 +204,9 @@ def health(request):
 @require_POST
 def provider_webhook(request, provider_name: str):
     """Status notifications from the provider. Authenticated by HMAC signature."""
-    provider = get_provider()
-    if provider_name != provider.name:
+    try:
+        provider = get_provider(provider_name)
+    except UnknownProvider:
         return JsonResponse({"error": {"code": "unknown_provider", "message": "Unknown provider."}}, status=404)
     if len(request.body) > MAX_WEBHOOK_BYTES:
         return JsonResponse({"error": {"code": "payload_too_large", "message": "Payload too large."}}, status=413)

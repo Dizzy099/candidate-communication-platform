@@ -25,6 +25,11 @@ class ScenarioTests(SimpleTestCase):
     def scenario(self, to, previous=0):
         return build_scenario(scenario_key(to), delivery_delay=3, read_delay=8, previous_messages_to_number=previous)
 
+    def test_email_markers(self):
+        self.assertEqual(scenario_key("x.bounce@example.com", "email"), "invalid_recipient")
+        self.assertEqual(scenario_key("deferred.k@example.com", "email"), "delivery_fails_first")
+        self.assertEqual(scenario_key("asha@example.com", "email"), "normal")
+
     def test_suffix_mapping(self):
         self.assertEqual(scenario_key("+919800000000"), "invalid_recipient")
         self.assertEqual(scenario_key("+919800000123"), "normal")
@@ -81,6 +86,14 @@ class ApiTests(TestCase):
         self.assertEqual(message.body_length, 5)
         self.assertEqual(list(message.events.order_by("next_attempt_at").values_list("status", flat=True)),
                          ["delivered", "read"])
+
+    def test_email_channel(self):
+        ok = self.submit(to="asha@example.com", channel="email", key="mail-1")
+        self.assertEqual((ok.status_code, ok.json()["channel"]), (201, "email"))
+        self.assertEqual(self.submit(to="+919800000123", channel="email", key="mail-2").status_code, 422)
+        bounce = self.submit(to="bounce.asha@example.com", channel="email", key="mail-3")
+        self.assertEqual(bounce.json()["error"]["code"], "invalid_recipient")
+        self.assertEqual(self.submit(channel="fax", key="mail-4").status_code, 400)
 
     def test_requires_api_key(self):
         self.assertEqual(self.submit(auth=None).status_code, 401)

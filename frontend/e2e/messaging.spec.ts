@@ -65,3 +65,33 @@ test("bulk send reports each recipient independently and allows eligible retries
   const flakyRow = results.getByRole("listitem").filter({ hasText: flaky });
   await expect(flakyRow.getByText(/Sent|Delivered|Read/)).toBeVisible({ timeout: 30_000 });
 });
+
+test("send by email through the second provider; a bounced address explains itself", async ({ page, request }) => {
+  const tag = uniqueTag();
+  const reader = `Lata ${tag}`;
+  const bounce = `Bounce ${tag}`; // email "bounce.<tag>@example.com" -> SimuMail invalid recipient
+  await createCandidate(request, reader, phoneEndingIn());
+  await createCandidate(request, bounce, phoneEndingIn());
+
+  await searchFor(page, tag);
+  await expect(page.getByText("1–2 of 2")).toBeVisible();
+  await page.getByRole("checkbox", { name: "Select all candidates on this page" }).check();
+  await page.getByRole("button", { name: "Send message" }).click();
+  const drawer = page.getByRole("dialog", { name: "Send Message" });
+  await drawer.getByRole("button", { name: /Email · SimuMail/ }).click();
+  await drawer.getByRole("textbox", { name: /Message/ }).fill("Your offer letter is attached, {{first_name}}.");
+  await drawer.getByRole("button", { name: "Send to 2 candidates" }).click();
+  await page.getByRole("dialog", { name: "Send message?" }).getByRole("button", { name: "Send to 2 candidates" }).click();
+
+  await expect(page.getByText("Message sent to 1 of 2 candidates. 1 failed.")).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "View details" }).click();
+  const results = page.getByRole("dialog", { name: "Delivery results" });
+  await expect(results.getByText(/via Email/)).toBeVisible();
+  await expect(results.getByText("Invalid email address:")).toBeVisible();
+  await results.getByRole("button", { name: "Done" }).click();
+
+  await page.getByRole("button", { name: reader }).click();
+  const history = page.getByRole("dialog", { name: "Communication history" });
+  await expect(history.getByText("Email", { exact: true })).toBeVisible();
+  await expect(history.getByText("Read")).toBeVisible({ timeout: 30_000 });
+});

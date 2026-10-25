@@ -37,13 +37,14 @@ def enqueue_batch(
     client_request_id: str | None = None,
     template: MessageTemplate | None = None,
     scheduled_at: datetime | None = None,
+    provider_name: str | None = None,
 ) -> EnqueueResult:
     if client_request_id:
         existing = MessageBatch.objects.filter(client_request_id=client_request_id).first()
         if existing:
             return EnqueueResult(existing, created=False)
 
-    provider = get_provider()
+    provider = get_provider(provider_name)
     now = timezone.now()
     status = MessageStatus.SCHEDULED if scheduled_at else MessageStatus.QUEUED
     max_attempts = settings.MESSAGING["MAX_ATTEMPTS"]

@@ -18,6 +18,7 @@ from .models import (
     MessageTemplate,
 )
 from .policy import error_copy, retry_block_reason
+from .providers import UnknownProvider, get_provider, list_providers
 from .services import templating
 
 _CLIENT_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
@@ -50,19 +51,26 @@ class MessageSerializer(serializers.ModelSerializer):
     retry_block_reason = serializers.SerializerMethodField()
     can_cancel = serializers.SerializerMethodField()
     retry_scheduled = serializers.SerializerMethodField()
+    provider_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
         fields = [
-            "id", "candidate_id", "batch_id", "body", "channel", "provider", "status", "status_label",
+            "id", "candidate_id", "batch_id", "body", "channel", "provider", "provider_label", "status", "status_label",
             "provider_message_id", "attempt_count", "max_attempts", "next_attempt_at", "retry_scheduled",
             "error", "can_retry", "retry_block_reason", "can_cancel",
             "created_at", "scheduled_at", "sent_at", "delivered_at", "read_at", "failed_at", "cancelled_at",
             "updated_at",
         ]
 
+    def get_provider_label(self, obj: Message) -> str:
+        try:
+            return get_provider(obj.provider).display_name
+        except UnknownProvider:
+            return obj.provider
+
     def get_error(self, obj: Message):
-        copy = error_copy(obj.error_category)
+        copy = error_copy(obj.error_category, obj.channel)
         if copy is None:
             return None
         return {
@@ -191,6 +199,15 @@ class SendMessageSerializer(serializers.Serializer):
         error_messages={"does_not_exist": "That template no longer exists."},
     )
     scheduled_at = serializers.DateTimeField(required=False, allow_null=True)
+    provider = serializers.CharField(required=False, allow_blank=True, source="provider_name")
+
+    def validate_provider(self, value: str) -> str | None:
+        if not value:
+            return None
+        names = [p.name for p in list_providers()]
+        if value not in names:
+            raise serializers.ValidationError(f"Unknown provider. Choose one of: {', '.join(names)}.")
+        return value
 
     def validate_body(self, value: str) -> str:
         limit = settings.MESSAGING["MAX_BODY_LENGTH"]

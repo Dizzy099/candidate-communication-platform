@@ -23,7 +23,10 @@ class FakeProvider(CommunicationProvider):
     channel = "sms"
     simulated = True
 
-    def __init__(self):
+    def __init__(self, name: str = "fake", channel: str = "sms"):
+        self.name = name
+        self.channel = channel
+        self.display_name = f"Fake {channel} provider"
         self.script: dict[str, list] = defaultdict(list)
         self.calls: list[OutboundMessage] = []
         self.health_status = "operational"
@@ -35,10 +38,11 @@ class FakeProvider(CommunicationProvider):
 
     def send(self, message: OutboundMessage) -> SendResult:
         self.calls.append(message)
-        outcome = self.script[message.to_phone].pop(0) if self.script[message.to_phone] else "ok"
+        recipient = message.to_email if self.channel == "email" else message.to_phone
+        outcome = self.script[recipient].pop(0) if self.script[recipient] else "ok"
         if isinstance(outcome, Exception):
             raise outcome
-        return SendResult(provider_message_id=f"fake_{len(self.calls)}", status="sent")
+        return SendResult(provider_message_id=f"{self.name}_{len(self.calls)}", status="sent")
 
     def health(self) -> ProviderHealth:
         return ProviderHealth(self.health_status, "test", timezone.now())

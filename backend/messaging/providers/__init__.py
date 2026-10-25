@@ -7,7 +7,7 @@ from .base import (
     StatusUpdate,
     WebhookError,
 )
-from .registry import get_provider, reset_provider_cache
+from .registry import UnknownProvider, get_provider, list_providers, reset_provider_cache
 
 __all__ = [
     "CommunicationProvider",
@@ -17,6 +17,8 @@ __all__ = [
     "SendResult",
     "StatusUpdate",
     "WebhookError",
+    "UnknownProvider",
     "get_provider",
+    "list_providers",
     "reset_provider_cache",
 ]

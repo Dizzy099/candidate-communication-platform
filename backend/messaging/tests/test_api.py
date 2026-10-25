@@ -11,7 +11,9 @@ from core.testing import ApiTestCase, make_candidate
 from messaging.models import Message, MessageStatus, MessageTemplate
 from messaging.services.dispatch import run_once
 
-from .fakes import invalid_recipient, temporary_error, unavailable
+from messaging.providers.registry import override_provider
+
+from .fakes import FakeProvider, invalid_recipient, temporary_error, unavailable
 
 
 class SendMessageApiTests(ApiTestCase):
@@ -56,6 +58,11 @@ class SendMessageApiTests(ApiTestCase):
     def test_unknown_candidate_is_404(self):
         response = self.client.post("/api/candidates/9999/messages", {"body": "Hi"}, format="json")
         self.assertEqual(response.status_code, 404)
+
+    def test_unknown_provider_is_rejected(self):
+        response = self.client.post(self.url(), {"body": "Hi", "provider": "carrier_pigeon"}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Unknown provider", response.json()["error"]["fields"]["provider"])
 
     def test_scheduled_send(self):
         when = timezone.now() + timedelta(hours=2)
@@ -221,7 +228,8 @@ class ProviderApiTests(ApiTestCase):
         run_once()
         body = self.client.get("/api/provider/health").json()
         self.assertEqual(body["status"], "operational")
-        self.assertTrue(body["provider"]["simulated"])
+        self.assertEqual(body["default_provider"], "fake")
+        self.assertTrue(body["providers"][0]["simulated"])
         self.assertEqual(body["stats"]["sent"], 1)
         self.provider.health_status = "unavailable"
         self.assertEqual(self.client.get("/api/provider/health").json()["status"], "unavailable")
@@ -246,3 +254,38 @@ class ProviderApiTests(ApiTestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["error"]["code"], "server_error")
         self.assertNotIn("hunter2", response.content.decode())
+
+
+class MultipleProviderTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.email = FakeProvider(name="fake_email", channel="email")
+        context = override_provider(self.provider, self.email)
+        context.__enter__()
+        self.addCleanup(context.__exit__, None, None, None)
+        self.asha = make_candidate("Asha Verma", "+919800000001", "asha@example.com")
+
+    def test_recruiter_chooses_the_provider_per_message(self):
+        sms = self.client.post(f"/api/candidates/{self.asha.pk}/messages", {"body": "By SMS"}, format="json").json()
+        mail = self.client.post(f"/api/candidates/{self.asha.pk}/messages", {"body": "By email", "provider": "fake_email"},
+                                format="json").json()
+        self.assertEqual((sms["provider"], sms["channel"]), ("fake", "sms"))
+        self.assertEqual((mail["provider"], mail["channel"], mail["provider_label"]), ("fake_email", "email", "Fake email provider"))
+        run_once()
+        self.assertEqual([c.body for c in self.provider.calls], ["By SMS"])
+        self.assertEqual([(c.body, c.to_email) for c in self.email.calls], [("By email", "asha@example.com")])
+        self.assertTrue(self.email.calls[0].status_callback_url.endswith("/api/webhooks/provider/fake_email/"))
+
+    def test_failure_wording_matches_the_channel(self):
+        self.email.queue("asha@example.com", invalid_recipient())
+        message = self.client.post(f"/api/candidates/{self.asha.pk}/messages", {"body": "Hi", "provider": "fake_email"},
+                                   format="json").json()
+        run_once()
+        detail = self.client.get(f"/api/messages/{message['id']}").json()
+        self.assertEqual(detail["error"]["title"], "Invalid email address")
+
+    def test_health_lists_every_provider(self):
+        self.email.health_status = "unavailable"
+        body = self.client.get("/api/provider/health").json()
+        self.assertEqual([p["name"] for p in body["providers"]], ["fake", "fake_email"])
+        self.assertEqual(body["status"], "unavailable", "overall status is the worst provider status")

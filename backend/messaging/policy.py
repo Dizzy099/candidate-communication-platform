@@ -78,8 +78,24 @@ ERROR_COPY: dict[str, ErrorCopy] = {
 }
 
 
-def error_copy(category: str) -> ErrorCopy | None:
-    return ERROR_COPY.get(category) if category else None
+# Wording that depends on the channel (a bounced email isn't an "invalid mobile number").
+CHANNEL_ERROR_COPY: dict[tuple[str, str], ErrorCopy] = {
+    ("email", ErrorCategory.INVALID_RECIPIENT): ErrorCopy(
+        "Invalid email address",
+        "The provider says this email address can't receive messages. Check the candidate's email; "
+        "retrying won't help.",
+    ),
+    ("email", ErrorCategory.DELIVERY_FAILED): ErrorCopy(
+        "Not delivered",
+        "The provider accepted the email but couldn't deliver it to the candidate's inbox. You can try again later.",
+    ),
+}
+
+
+def error_copy(category: str, channel: str = "sms") -> ErrorCopy | None:
+    if not category:
+        return None
+    return CHANNEL_ERROR_COPY.get((channel, category)) or ERROR_COPY.get(category)
 
 
 def backoff_seconds(failed_attempts: int) -> float:

@@ -1,4 +1,4 @@
-api: cd backend && gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 2 --threads 4
+api: cd backend && gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 1 --threads 8
 worker: cd backend && python manage.py run_worker
 simulator: cd simulator && python manage.py runsimulator --host 127.0.0.1 --port 8001
 web: cd web && PORT=$APP_PORT HOSTNAME=0.0.0.0 node server.js

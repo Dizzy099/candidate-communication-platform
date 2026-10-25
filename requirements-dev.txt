@@ -1,0 +1,4 @@
+# Everything needed to run all three Python processes locally from one virtualenv.
+-r backend/requirements.txt
+-r simulator/requirements.txt
+honcho==2.0.0

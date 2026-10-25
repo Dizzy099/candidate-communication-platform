@@ -2,6 +2,8 @@
 
 A recruiter tool for messaging candidates one at a time or in bulk, and for tracking every message from **Queued → Sent → Delivered → Read**. It handles failures honestly: it shows plain-English reasons, retries automatically when that's safe, and offers a manual **Retry** only when retrying can help.
 
+**Live demo:** https://candidate-communication-platform.onrender.com (free tier: the first load after idling takes about a minute; demo data resets on restart)
+
 Stack: **Next.js + React + TypeScript + Material UI** frontend, **Python + Django REST Framework** backend, a background **worker**, and a separate **provider simulator** service.
 
 ![Candidate list](docs/screenshots/01-candidates.png)
@@ -276,7 +278,7 @@ Frontend: `API_ORIGIN` (default `http://127.0.0.1:8000`) is where Next.js proxie
 | Frontend unit (Vitest) | `cd frontend && npm test` | **17 passed** |
 | Type check / lint | `npm run typecheck` · `npm run lint` | clean |
 | Production build | `npm run build` | succeeds |
-| End-to-end (Playwright, real browser + full stack) | start the stack, then `cd frontend && npx playwright test` | **7 passed**: on the dev stack, on Docker Compose with PostgreSQL, and on the single-container image |
+| End-to-end (Playwright, real browser + full stack) | start the stack, then `cd frontend && npx playwright test` | **7 passed**: on the dev stack, Docker Compose with PostgreSQL, the single-container image and the live Render site |
 
 (On macOS/Linux use `../.venv/bin/python`. For the first Playwright run, install the browser with `npx playwright install chromium`.)
 

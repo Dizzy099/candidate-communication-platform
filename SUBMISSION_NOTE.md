@@ -1,9 +1,9 @@
 # Submission: Candidate Communication Platform
 
 **Repository:** https://github.com/Dizzy099/candidate-communication-platform
-**Live demo:** _[add the deployed link, or delete this line if submitting the repository only]_
+**Live demo:** https://candidate-communication-platform.onrender.com (free hosting: the first load after a quiet period can take about a minute)
 
-Hi,
+Hi Mehrabhumika,
 
 Please find my submission for the Candidate Communication Platform assignment.
 

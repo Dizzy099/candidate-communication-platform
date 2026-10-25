@@ -46,11 +46,11 @@ Legend: ✅ done and verified · 🟡 done, partly verified · ⛔ blocked (exte
 | Backend tests | ✅ | 85 passing (SQLite and PostgreSQL) |
 | Simulator tests | ✅ | 18 passing |
 | Frontend typecheck, lint, unit tests, build | ✅ | Clean; 17 passing; build OK |
-| End-to-end browser tests | ✅ | 7 passing on dev, Compose/PostgreSQL and single-container |
+| End-to-end browser tests | ✅ | 7 passing on dev, Compose/PostgreSQL, single-container and the live Render site |
 | Docker Compose (PostgreSQL) | ✅ | Built and run locally |
 | Single-container deploy image | ✅ | Built and run locally; e2e passed |
 | README, API docs, manual checklist | ✅ | |
 | GitHub repository pushed | ✅ | https://github.com/Dizzy099/candidate-communication-platform |
-| Public deployment | ⛔ | Needs a hosting account login (Render blueprint ready) |
+| Public deployment | ✅ | https://candidate-communication-platform.onrender.com: all 7 browser tests passed against it |
 | Authentication | ✖ | Out of scope by decision (README §12) |
 | Template edit/delete UI | ✖ | API supports it; UI covers create and use |

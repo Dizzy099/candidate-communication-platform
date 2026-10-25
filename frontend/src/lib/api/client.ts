@@ -56,8 +56,10 @@ export async function apiFetch<T>(path: string, init: RequestInit & { json?: unk
 
   if (!response.ok) {
     const error = (data as ErrorBody | null)?.error;
+    // A non-JSON 5xx comes from the proxy, not Django: the API itself is unreachable.
+    const fallback = response.status >= 500 && !error ? GENERIC[502] : GENERIC[response.status];
     throw new ApiError(
-      error?.message ?? GENERIC[response.status] ?? "Something went wrong. Please try again.",
+      error?.message ?? fallback ?? "Something went wrong. Please try again.",
       response.status,
       error?.code ?? `http_${response.status}`,
       error?.fields ?? {},

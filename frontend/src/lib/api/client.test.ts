@@ -37,6 +37,12 @@ describe("apiFetch", () => {
     expect(errorMessage(error)).toBe("The server is temporarily unreachable. Please try again shortly.");
   });
 
+  it("treats a non-JSON 500 from the proxy as the API being unreachable", async () => {
+    mockFetch(async () => new Response("Internal Server Error", { status: 500 }));
+    const error = (await apiFetch("/x").catch((e: unknown) => e)) as ApiError;
+    expect(error.message).toMatch(/temporarily unreachable/);
+  });
+
   it("explains network failures", async () => {
     mockFetch(async () => {
       throw new TypeError("Failed to fetch");

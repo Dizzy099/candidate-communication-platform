@@ -1,0 +1,21 @@
+# Render Blueprint: one free Docker web service running the whole demo.
+# Render dashboard -> New -> Blueprint -> pick this repository.
+services:
+  - type: web
+    name: candidate-communication-platform
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: SIM_DJANGO_SECRET_KEY
+        generateValue: true
+      - key: PROVIDER_API_KEY
+        generateValue: true
+      - key: PROVIDER_WEBHOOK_SECRET
+        generateValue: true
+      - key: DEMO_CONTROLS_ENABLED
+        value: "true"

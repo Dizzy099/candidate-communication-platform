@@ -1,0 +1,8 @@
+**/.env
+**/*.sqlite3*
+**/__pycache__
+**/node_modules
+**/.next
+.venv
+.git
+frontend/test-results

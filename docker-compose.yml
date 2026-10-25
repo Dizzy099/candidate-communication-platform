@@ -1,0 +1,80 @@
+# Full stack with PostgreSQL:   docker compose up --build   ->  http://localhost:3000
+# The defaults below are for local use only. Override them (e.g. in a .env file
+# next to this compose file) before exposing anything to the internet.
+
+x-api-env: &api-env
+  DJANGO_DEBUG: "false"
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-compose-local-only-secret-change-me}
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,api
+  DJANGO_SECURE_COOKIES: "false"
+  DATABASE_URL: postgres://ccp:${POSTGRES_PASSWORD:-ccp-local-only}@db:5432/ccp
+  PROVIDER_BACKEND: simulator
+  PROVIDER_BASE_URL: http://simulator:8001
+  PROVIDER_API_KEY: ${PROVIDER_API_KEY:-compose-local-provider-key}
+  PROVIDER_WEBHOOK_SECRET: ${PROVIDER_WEBHOOK_SECRET:-compose-local-webhook-secret}
+  PUBLIC_WEBHOOK_BASE_URL: http://api:8000
+  DEMO_CONTROLS_ENABLED: "true"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ccp
+      POSTGRES_USER: ccp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ccp-local-only}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ccp -d ccp"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./backend
+    environment: *api-env
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             (python manage.py seed_demo || true) &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --access-logfile -"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: ./backend
+    environment: *api-env
+    command: python manage.py run_worker
+    depends_on:
+      api:
+        condition: service_healthy
+
+  simulator:
+    build: ./simulator
+    environment:
+      SIM_DEBUG: "false"
+      SIM_DJANGO_SECRET_KEY: ${SIM_DJANGO_SECRET_KEY:-compose-local-only-sim-secret}
+      SIM_ALLOWED_HOSTS: simulator,localhost,127.0.0.1
+      SIM_API_KEY: ${PROVIDER_API_KEY:-compose-local-provider-key}
+      SIM_WEBHOOK_SECRET: ${PROVIDER_WEBHOOK_SECRET:-compose-local-webhook-secret}
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_ORIGIN: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

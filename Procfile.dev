@@ -1,0 +1,4 @@
+api: cd backend && python manage.py runserver 127.0.0.1:8000
+worker: cd backend && python manage.py run_worker
+simulator: cd simulator && python manage.py runsimulator --migrate --port 8001
+web: cd frontend && npm run dev -- -p 3000
